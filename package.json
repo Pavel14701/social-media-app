@@ -1,26 +1,47 @@
 {
-  "name": "server",
+  "name": "social-media-app",
   "version": "1.0.0",
-  "description": "",
+  "description": "PostIt is a fully-featured social media web application, built with the MERN stack.",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "server": "nodemon server.js",
-    "heroku-postbuild": "cd client && npm install && npm run build"
+    "start:nest": "ts-node src/main.ts"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pavel14701/social-media-app.git"
+  },
+  "keywords": [],
   "author": "",
   "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Pavel14701/social-media-app/issues"
+  },
+  "homepage": "https://github.com/Pavel14701/social-media-app#readme",
+  "devDependencies": {
+    "@types/bad-words": "^3.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/mongoose": "^5.11.96",
+    "@types/node": "^25.0.3",
+    "@types/passport-jwt": "^4.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
   "dependencies": {
-    "bad-words": "^3.0.3",
-    "bcrypt": "^5.0.1",
-    "cors": "^2.8.5",
-    "dotenv": "^16.0.0",
-    "express": "^4.18.1",
-    "express-validator": "^6.14.0",
-    "jsonwebtoken": "^8.5.1",
-    "mongoose": "^6.3.2",
-    "nodemon": "^2.0.16",
-    "socket.io": "^4.5.1",
-    "validator": "^13.7.0"
+    "@nestjs/common": "^11.1.9",
+    "@nestjs/core": "^11.1.9",
+    "@nestjs/mongoose": "^11.0.4",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.1.9",
+    "@nestjs/platform-socket.io": "^11.1.9",
+    "argon2": "^0.44.0",
+    "bad-words": "^4.0.0",
+    "class-validator": "^0.14.3",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.0.2",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
   }
 }
