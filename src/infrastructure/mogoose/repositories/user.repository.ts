@@ -76,22 +76,35 @@ export class UserRepository
   }
 
   async findByStatus(status: string): Promise<UserDm[]> {
-    const docs = await this.userModel.find({ status }).exec();
+    const docs = await this.userModel.find(
+      { status }
+    )
+      .exec();
     return docs.map(d => this.toDomain(d));
   }
 
   async findActive(limit = 50): Promise<UserDm[]> {
-    const docs = await this.userModel.find({ isActive: true }).limit(limit).exec();
+    const docs = await this.userModel.find(
+      { isActive: true }
+    )
+      .limit(limit)
+      .exec();
     return docs.map(d => this.toDomain(d));
   }
 
   async findAdmins(): Promise<UserDm[]> {
-    const docs = await this.userModel.find({ isAdmin: true }).exec();
+    const docs = await this.userModel.find(
+      { isAdmin: true }
+    )
+      .exec();
     return docs.map(d => this.toDomain(d));
   }
 
   async findVerified(): Promise<UserDm[]> {
-    const docs = await this.userModel.find({ verified: true }).exec();
+    const docs = await this.userModel.find(
+      { verified: true }
+    )
+      .exec();
     return docs.map(d => this.toDomain(d));
   }
 
@@ -107,12 +120,18 @@ export class UserRepository
         { lastName: { $regex: keyword, $options: 'i' } },
         { username: { $regex: keyword, $options: 'i' } }
       ]
-    }).limit(limit).exec();
+    })
+      .limit(limit)
+      .exec();
     return docs.map(d => this.toDomain(d));
   }
 
   async searchByBiography(keyword: string, limit = 20): Promise<UserDm[]> {
-    const docs = await this.userModel.find({ biography: { $regex: keyword, $options: 'i' } }).limit(limit).exec();
+    const docs = await this.userModel.find(
+      { biography: { $regex: keyword, $options: 'i' } }
+    )
+      .limit(limit)
+      .exec();
     return docs.map(d => this.toDomain(d));
   }
 
@@ -133,11 +152,19 @@ export class UserRepository
   }
 
   async updateLastSeen(userId: string): Promise<void> {
-    await this.userModel.findByIdAndUpdate(new Types.ObjectId(userId), { lastSeenAt: new Date() }).exec();
+    await this.userModel.findByIdAndUpdate(
+      new Types.ObjectId(userId), 
+      { lastSeenAt: new Date() }
+    )
+      .exec();
   }
 
   async deactivate(userId: string): Promise<void> {
-    await this.userModel.findByIdAndUpdate(new Types.ObjectId(userId), { isActive: false, status: 'banned' }).exec();
+    await this.userModel.findByIdAndUpdate(
+      new Types.ObjectId(userId), 
+      { isActive: false, status: 'banned' }
+    )
+      .exec();
   }
 
   async countByStatus(status: string): Promise<number> {
@@ -148,64 +175,69 @@ export class UserRepository
     await this.userModel.updateOne(
       { _id: new Types.ObjectId(userId) },
       { $addToSet: { friends: new Types.ObjectId(friendId) } }
-    ).exec();
+    )
+      .exec();
   }
 
   async removeFriend(userId: string, friendId: string): Promise<void> {
     await this.userModel.updateOne(
       { _id: new Types.ObjectId(userId) },
       { $pull: { friends: new Types.ObjectId(friendId) } }
-    ).exec();
+    )
+      .exec();
   }
 
   async followUser(userId: string, targetId: string): Promise<void> {
     await this.userModel.updateOne(
       { _id: new Types.ObjectId(userId) },
       { $addToSet: { following: new Types.ObjectId(targetId) } }
-    ).exec();
+    )
+      .exec();
 
     await this.userModel.updateOne(
       { _id: new Types.ObjectId(targetId) },
       { $addToSet: { followers: new Types.ObjectId(userId) } }
-    ).exec();
+    )
+      .exec();
   }
 
   async unfollowUser(userId: string, targetId: string): Promise<void> {
     await this.userModel.updateOne(
       { _id: new Types.ObjectId(userId) },
       { $pull: { following: new Types.ObjectId(targetId) } }
-    ).exec();
+    )
+      .exec();
 
     await this.userModel.updateOne(
       { _id: new Types.ObjectId(targetId) },
       { $pull: { followers: new Types.ObjectId(userId) } }
-    ).exec();
+    )
+      .exec();
   }
 
-  // --- Дополнительные методы из IUserRepository ---
-
-  async findAll(): Promise<UserDm[]> {
-    const docs = await this.userModel.find().exec();
-    return docs.map(d => this.toDomain(d));
+  async updateLastLogin(userId: string): Promise<void> {
+    await this.userModel
+      .findByIdAndUpdate(new Types.ObjectId(userId), { lastLoginAt: new Date() })
+      .exec();
   }
 
-  async findById(id: string): Promise<UserDm | null> {
-    const doc = await this.userModel.findById(new Types.ObjectId(id)).exec();
-    return doc ? this.toDomain(doc) : null;
+  async incrementFailedLoginAttempts(userId: string): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: new Types.ObjectId(userId) },
+        { $inc: { 'security.failedLoginAttempts': 1 } }
+      )
+      .exec();
   }
 
-  async update(id: string, entity: Partial<UserDm>): Promise<UserDm | null> {
-    const payload = this.toPersistence(entity);
-    const doc = await this.userModel.findByIdAndUpdate(
-      new Types.ObjectId(id),
-      { $set: payload },
-      { new: true }
-    ).exec();
-    return doc ? this.toDomain(doc) : null;
+  async resetFailedLoginAttempts(userId: string): Promise<void> {
+    await this.userModel
+      .updateOne(
+        { _id: new Types.ObjectId(userId) },
+        { $set: { 'security.failedLoginAttempts': 0 } }
+      )
+      .exec();
   }
 
-  async delete(id: string): Promise<void> {
-    await this.userModel.findByIdAndDelete(new Types.ObjectId(id)).exec();
-  }
 
 }

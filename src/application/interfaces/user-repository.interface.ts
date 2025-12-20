@@ -23,4 +23,10 @@ export interface IUserRepository extends IBaseRepository<UserDm> {
   removeFriend(userId: string, friendId: string): Promise<void>;
   followUser(userId: string, targetId: string): Promise<void>;
   unfollowUser(userId: string, targetId: string): Promise<void>;
+  updateLastLogin(userId: string): Promise<void>;
+  incrementFailedLoginAttempts(userId: string): Promise<void>;
+  resetFailedLoginAttempts(userId: string): Promise<void>;
+  deactivate(userId: string): Promise<void>;
 }
+
+export const USER_REPOSITORY = Symbol('USER_REPOSITORY');

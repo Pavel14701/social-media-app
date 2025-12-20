@@ -1,54 +1,78 @@
-import { Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import * as jwt from 'jsonwebtoken';
-import { UserService } from './user.service';
-import { User } from '../../users/schemas/user.schema';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { UserDm } from '../../domain/entities/user.entity';
+import type { IJwtAdapter } from '../interfaces/jwt-adapter.interface';
+import type { IUserRepository } from '../interfaces/user-repository.interface';
+import type { IPasswordAdapter } from '../interfaces/password-adapter.interface';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    @Inject('IJwtAdapter') private readonly jwtAdapter: IJwtAdapter,
+    @Inject('IUserRepository') private readonly userRepository: IUserRepository,
+    @Inject('IPasswordAdapter') private readonly passwordAdapter: IPasswordAdapter,
+  ) {}
 
-  async register(username: string, email: string, password: string) {
-    if (!(username && email && password)) {
-      throw new Error('All input required');
-    }
 
-    const normalizedEmail = email.toLowerCase();
 
-    const existingUser = await this.userService.findByEmail(normalizedEmail);
-    if (existingUser) throw new Error('Email already exists');
-
-    const existingByUsername = await this.userService.findByUsername(username);
-    if (existingByUsername) throw new Error('Username already exists');
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await this.userService.create({
+  async register(username: string, email: string, password: string): Promise<UserDm> {
+    const existing = await this.userRepository.findByEmail(email);
+    if (existing) throw new UnauthorizedException('Email already registered');
+    const passwordHash = await this.passwordAdapter.hash(password);
+    const user = new UserDm({
       username,
-      email: normalizedEmail,
-      password: hashedPassword,
+      email,
+      passwordHash,
+      isActive: true,
+      status: 'active',
+      isAdmin: false,
+      verified: false,
+      roles: ['user'],
     });
 
-    const token = jwt.sign({ userId: user.id, isAdmin: user.isAdmin }, process.env.TOKEN_KEY!);
-
-    return { token, username: user.username, userId: user.id, isAdmin: user.isAdmin };
+    return this.userRepository.create(user);
   }
 
-  async login(email: string, password: string) {
-    if (!(email && password)) {
-      throw new Error('All input required');
+  async login(username: string, password: string) {
+    const user = await this.userRepository.findByUsername(username);
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const match = await this.passwordAdapter.verify(user.passwordHash, password);
+    if (!match) {
+      // бизнес‑сценарий: фиксируем неудачную попытку
+      await this.userRepository.incrementFailedLoginAttempts(user.id);
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    const normalizedEmail = email.toLowerCase();
-    const user = await this.userService.findByEmail(normalizedEmail);
+    const payload = { userId: user.id, isAdmin: user.isAdmin };
+    const accessToken = this.jwtAdapter.generateAccessToken(payload);
+    const refreshToken = this.jwtAdapter.generateRefreshToken(payload);
 
-    if (!user) throw new Error('Email or password incorrect');
+    // бизнес‑сценарий: успешный вход
+    await this.userRepository.resetFailedLoginAttempts(user.id);
+    await this.userRepository.updateLastLogin(user.id);
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) throw new Error('Email or password incorrect');
+    return { accessToken, refreshToken };
+  }
 
-    const token = jwt.sign({ userId: user.id, isAdmin: user.isAdmin }, process.env.TOKEN_KEY!);
+  async verify(token: string) {
+    try {
+      return this.jwtAdapter.verifyToken(token);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+  }
 
-    return { token, username: user.username, userId: user.id, isAdmin: user.isAdmin };
+  async logout(userId: string) {
+    await this.userRepository.deactivate(userId);
+    return { success: true };
+  }
+
+  async refresh(refreshToken: string) {
+    const payload = this.jwtAdapter.verifyToken(refreshToken);
+    const newAccessToken = this.jwtAdapter.generateAccessToken({
+      userId: payload.userId,
+      isAdmin: payload.isAdmin,
+    });
+    return { accessToken: newAccessToken };
   }
 }

@@ -4,7 +4,7 @@ export type UserSecurity = { twoFactorEnabled?: boolean; failedLoginAttempts?: n
 
 
 export class UserDm {
-  id?: string;
+  id!: string;
   username!: string;
   email!: string;
   passwordHash!: string;

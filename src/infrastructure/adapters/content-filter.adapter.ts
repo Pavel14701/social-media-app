@@ -14,4 +14,3 @@ export class BadWordsFilterAdapter implements IContentFilter {
     return this.filter.isProfane(text);
   }
 }
-'s'
