@@ -163,34 +163,10 @@ export class MessageRepository
     return docs.map((doc) => this.toDomain(doc));
   }
 
-  protected toDomain(doc: Message): MessageDm {
-    return new MessageDm(
-      doc._id.toString(),
-      doc.conversation.toString(),
-      doc.sender.toString(),
-      doc.content,
-      doc.read,
-      doc.attachments,
-      doc.edited,
-      doc.deleted,
-      doc.replyTo ? doc.replyTo.toString() : undefined,
-      doc.type,
-      doc.reactions,
-      doc.delivered,
-      doc.seenBy?.map((id) => id.toString()) ?? [],
-      doc.threadId ? doc.threadId.toString() : undefined,
-      doc.forwardedFrom ? doc.forwardedFrom.toString() : undefined,
-      doc.mentions,
-      doc.priority,
-      doc.expiresAt,
-      doc.location,
-      doc.language,
-      doc.encrypted,
-      doc.metadata,
-      doc.createdAt,
-      doc.updatedAt,
-    );
-  }
+protected toDomain(doc: Message): MessageDm {
+  return MessageDm.fromDoc(doc);
+}
+
 
   protected toPersistence(entity: Partial<MessageDm>): Partial<Message> {
     const update: Partial<Message> = {};
