@@ -36,6 +36,13 @@ export class PostRepository
     return docs.map((doc) => this.toDomain(doc));
   }
 
+  async searchInContent(keyword: string): Promise<PostDm[]> {
+    const docs = await this.postModel
+      .find({ content: { $regex: keyword, $options: 'i' } })
+      .exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
   async findSorted(sortBy: string): Promise<PostDm[]> {
     const docs = await this.postModel.find().sort(sortBy).exec();
     return docs.map((doc) => this.toDomain(doc));
@@ -59,19 +66,128 @@ export class PostRepository
     await this.postModel.findByIdAndUpdate(postId, { $inc: { commentCount: 1 } }).exec();
   }
 
-  protected toDomain(doc: Post): PostDm {
-    return new PostDm(
-      doc._id.toString(),
-      doc.title,
-      doc.content,
-      doc.edited,
-      doc.likeCount,
-      doc.commentCount,
-      doc.poster.toString(),
-      doc.createdAt,
-      doc.updatedAt,
-    );
+  async incrementViewCount(postId: string): Promise<void> {
+    await this.postModel.findByIdAndUpdate(postId, { $inc: { views: 1 } }).exec();
   }
+
+  async updateContent(postId: string, newTitle: string, newContent: string): Promise<PostDm | null> {
+    const doc = await this.postModel.findByIdAndUpdate(
+      postId,
+      { title: newTitle, content: newContent, edited: true },
+      { new: true }
+    ).exec();
+    return doc ? this.toDomain(doc) : null;
+  }
+
+  async deletePost(postId: string): Promise<void> {
+    await this.postModel.findByIdAndDelete(postId).exec();
+  }
+
+  async deleteByAuthor(authorId: string): Promise<void> {
+    await this.postModel.deleteMany({ poster: authorId }).exec();
+  }
+
+  async countByAuthor(authorId: string): Promise<number> {
+    return this.postModel.countDocuments({ poster: authorId }).exec();
+  }
+
+  async findRecentByAuthor(authorId: string, limit: number): Promise<PostDm[]> {
+    const docs = await this.postModel
+      .find({ poster: authorId })
+      .sort('-createdAt')
+      .limit(limit)
+      .exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async findByTags(tags: string[]): Promise<PostDm[]> {
+    const docs = await this.postModel.find({ tags: { $in: tags } }).exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async findPublished(): Promise<PostDm[]> {
+    const docs = await this.postModel.find({ isPublished: true }).exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async findDrafts(): Promise<PostDm[]> {
+    const docs = await this.postModel.find({ status: 'draft' }).exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async findByCategory(category: string): Promise<PostDm[]> {
+    const docs = await this.postModel.find({ category }).exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async findMostLiked(limit: number): Promise<PostDm[]> {
+    const docs = await this.postModel.find().sort('-likeCount').limit(limit).exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async findLeastLiked(limit: number): Promise<PostDm[]> {
+    const docs = await this.postModel.find().sort('likeCount').limit(limit).exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async findMostViewed(limit: number): Promise<PostDm[]> {
+    const docs = await this.postModel.find().sort('-views').limit(limit).exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async findLeastViewed(limit: number): Promise<PostDm[]> {
+    const docs = await this.postModel.find().sort('views').limit(limit).exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async findWithoutComments(limit: number): Promise<PostDm[]> {
+    const docs = await this.postModel.find({ commentCount: 0 }).limit(limit).exec();
+    return docs.map((doc) => this.toDomain(doc));
+  }
+
+  async getTopAuthors(limit: number): Promise<{ authorId: string; count: number }[]> {
+    const result = await this.postModel.aggregate([
+      { $group: { _id: '$poster', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: limit }
+    ]);
+    return result.map(r => ({ authorId: r._id.toString(), count: r.count }));
+  }
+
+  async getTrendingTags(limit: number): Promise<{ tag: string; count: number }[]> {
+    const result = await this.postModel.aggregate([
+      { $unwind: '$tags' },
+      { $group: { _id: '$tags', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: limit }
+    ]);
+    return result.map(r => ({ tag: r._id, count: r.count }));
+  }
+
+protected toDomain(doc: Post): PostDm {
+  return new PostDm(
+    doc._id.toString(),
+    doc.title,
+    doc.content,
+    doc.edited,
+    doc.likeCount,
+    doc.commentCount,
+    doc.poster.toString(),
+    doc.views,
+    doc.tags,
+    doc.isPublished,
+    doc.attachments,
+    doc.status,
+    doc.category,
+    doc.slug,
+    doc.flagged,
+    doc.shareCount,
+    doc.rating,
+    doc.updatedBy,
+    doc.createdAt instanceof Date ? doc.createdAt : undefined,
+    doc.updatedAt instanceof Date ? doc.updatedAt : undefined,
+  );
+}
 
   protected toPersistence(entity: Partial<PostDm>): Partial<Post> {
     const update: Partial<Post> = {};
@@ -80,6 +196,17 @@ export class PostRepository
     if (entity.edited !== undefined) update.edited = entity.edited;
     if (entity.likeCount !== undefined) update.likeCount = entity.likeCount;
     if (entity.commentCount !== undefined) update.commentCount = entity.commentCount;
+    if (entity.views !== undefined) update.views = entity.views;
+    if (entity.tags !== undefined) update.tags = entity.tags;
+    if (entity.isPublished !== undefined) update.isPublished = entity.isPublished;
+    if (entity.attachments !== undefined) update.attachments = entity.attachments;
+    if (entity.status !== undefined) update.status = entity.status;
+    if (entity.category !== undefined) update.category = entity.category;
+    if (entity.slug !== undefined) update.slug = entity.slug;
+    if (entity.flagged !== undefined) update.flagged = entity.flagged;
+    if (entity.shareCount !== undefined) update.shareCount = entity.shareCount;
+    if (entity.rating !== undefined) update.rating = entity.rating;
+    if (entity.updatedBy !== undefined) update.updatedBy = entity.updatedBy;
     if (entity.posterId) update.poster = entity.posterId;
     return update;
   }

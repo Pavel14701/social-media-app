@@ -11,7 +11,7 @@ export class User extends Document {
   email!: string;
 
   @Prop({ required: true })
-  password!: string;
+  passwordHash!: string;
 
   @Prop({ default: '' })
   biography: string = '';
