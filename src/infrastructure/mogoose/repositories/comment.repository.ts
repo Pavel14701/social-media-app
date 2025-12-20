@@ -24,17 +24,27 @@ export class CommentRepository
 
   async findByPost(postId: string): Promise<CommentDm[]> {
     const docs = await this.commentModel.find({ post: new Types.ObjectId(postId) }).sort('createdAt').exec();
-    return docs.map((doc) => this.toDomain(doc));
+    return docs.map(this.toDomain);
+  }
+
+  async findByMessage(messageId: string): Promise<CommentDm[]> {
+    const docs = await this.commentModel.find({ message: new Types.ObjectId(messageId) }).sort('createdAt').exec();
+    return docs.map(this.toDomain);
+  }
+
+  async findByComment(commentId: string): Promise<CommentDm[]> {
+    const docs = await this.commentModel.find({ parent: new Types.ObjectId(commentId) }).sort('createdAt').exec();
+    return docs.map(this.toDomain);
   }
 
   async findByUser(userId: string): Promise<CommentDm[]> {
     const docs = await this.commentModel.find({ commenter: new Types.ObjectId(userId) }).sort('-createdAt').exec();
-    return docs.map((doc) => this.toDomain(doc));
+    return docs.map(this.toDomain);
   }
 
   async findReplies(parentId: string): Promise<CommentDm[]> {
     const docs = await this.commentModel.find({ parent: new Types.ObjectId(parentId) }).sort('createdAt').exec();
-    return docs.map((doc) => this.toDomain(doc));
+    return docs.map(this.toDomain);
   }
 
   async updateContent(commentId: string, newContent: string): Promise<CommentDm | null> {
@@ -54,8 +64,24 @@ export class CommentRepository
     await this.commentModel.deleteMany({ post: new Types.ObjectId(postId) }).exec();
   }
 
+  async deleteByMessage(messageId: string): Promise<void> {
+    await this.commentModel.deleteMany({ message: new Types.ObjectId(messageId) }).exec();
+  }
+
+  async deleteByComment(commentId: string): Promise<void> {
+    await this.commentModel.deleteMany({ parent: new Types.ObjectId(commentId) }).exec();
+  }
+
   async countByPost(postId: string): Promise<number> {
     return this.commentModel.countDocuments({ post: new Types.ObjectId(postId) }).exec();
+  }
+
+  async countByMessage(messageId: string): Promise<number> {
+    return this.commentModel.countDocuments({ message: new Types.ObjectId(messageId) }).exec();
+  }
+
+  async countByComment(commentId: string): Promise<number> {
+    return this.commentModel.countDocuments({ parent: new Types.ObjectId(commentId) }).exec();
   }
 
   async countByUser(userId: string): Promise<number> {
@@ -124,8 +150,40 @@ export class CommentRepository
     const docs = await this.commentModel.find({
       createdAt: { $gte: start, $lte: end }
     }).exec();
-    return docs.map((doc) => this.toDomain(doc));
+    return docs.map(this.toDomain);
   }
+
+async updateSource(commentId: string, source: string): Promise<void> {
+  await this.commentModel.findByIdAndUpdate(commentId, { source }).exec();
+}
+
+async updateMetadata(commentId: string, metadata: Record<string, any>): Promise<void> {
+  await this.commentModel.findByIdAndUpdate(commentId, { metadata }).exec();
+}
+
+async updateDeviceInfo(commentId: string, ipAddress?: string, deviceId?: string): Promise<void> {
+  await this.commentModel.findByIdAndUpdate(commentId, { ipAddress, deviceId }).exec();
+}
+
+async setExpiration(commentId: string, expiresAt: Date): Promise<void> {
+  await this.commentModel.findByIdAndUpdate(commentId, { expiresAt }).exec();
+}
+
+async updatePriority(commentId: string, priority: number): Promise<void> {
+  await this.commentModel.findByIdAndUpdate(commentId, { priority }).exec();
+}
+
+async findExpired(): Promise<CommentDm[]> {
+  const now = new Date();
+  const docs = await this.commentModel.find({ expiresAt: { $lte: now } }).exec();
+  return docs.map(this.toDomain);
+}
+
+async findByPriority(minPriority: number): Promise<CommentDm[]> {
+  const docs = await this.commentModel.find({ priority: { $gte: minPriority } }).exec();
+  return docs.map(this.toDomain);
+}
+
 
   protected toDomain(doc: Comment): CommentDm {
     return CommentDm.fromDoc(doc);
@@ -133,21 +191,54 @@ export class CommentRepository
 
   protected toPersistence(entity: Partial<CommentDm>): Partial<Comment> {
     const update: Partial<Comment> = {};
-    if (entity.commenterId) update.commenter = new Types.ObjectId(entity.commenterId);
-    if (entity.postId) update.post = new Types.ObjectId(entity.postId);
-    if (entity.content !== undefined) update.content = entity.content;
-    if (entity.parent) update.parent = new Types.ObjectId(entity.parent);
-    if (entity.children) update.children = entity.children.map((id) => new Types.ObjectId(id));
-    if (entity.reactions) update.reactions = entity.reactions.map((r) => ({
-      userId: new Types.ObjectId(r.userId),
-      type: r.type,
-    }));
+
+    if (entity.commenterId) {
+        update.commenter = new Types.ObjectId(entity.commenterId);
+    }
+
+    // универсальная цель
+    if (entity.targetId) {
+        update.targetId = new Types.ObjectId(entity.targetId);
+    }
+    if (entity.targetType) {
+        update.targetType = entity.targetType;
+    }
+
+    if (entity.content !== undefined) {
+        update.content = entity.content;
+    }
+
+    if (entity.parent) {
+        update.parent = new Types.ObjectId(entity.parent);
+    }
+
+    if (entity.children) {
+        update.children = entity.children.map((id) => new Types.ObjectId(id));
+    }
+
+    if (entity.reactions) {
+        update.reactions = entity.reactions.map((r) => ({
+        userId: new Types.ObjectId(r.userId),
+        type: r.type,
+        }));
+    }
+
     if (entity.edited !== undefined) update.edited = entity.edited;
     if (entity.flagged !== undefined) update.flagged = entity.flagged;
     if (entity.reportReasons !== undefined) update.reportReasons = entity.reportReasons;
     if (entity.mentions !== undefined) update.mentions = entity.mentions;
     if (entity.attachments !== undefined) update.attachments = entity.attachments;
     if (entity.status !== undefined) update.status = entity.status;
+
+    // новые поля
+    if (entity.source !== undefined) update.source = entity.source;
+    if (entity.metadata !== undefined) update.metadata = entity.metadata;
+    if (entity.ipAddress !== undefined) update.ipAddress = entity.ipAddress;
+    if (entity.deviceId !== undefined) update.deviceId = entity.deviceId;
+    if (entity.expiresAt !== undefined) update.expiresAt = entity.expiresAt;
+    if (entity.priority !== undefined) update.priority = entity.priority;
+
     return update;
-  }
+    }
+
 }
