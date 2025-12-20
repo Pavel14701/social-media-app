@@ -14,7 +14,6 @@ export abstract class BaseRepository<TDomain, TRaw> {
   }
 
   async update(id: string, entity: Partial<TDomain>): Promise<TDomain | null> {
-    // преобразуем доменную модель в формат базы
     const update = this.toPersistence(entity);
     const doc = await this.model.findByIdAndUpdate(id, update, { new: true }).exec();
     return doc ? this.toDomain(doc) : null;
@@ -24,7 +23,6 @@ export abstract class BaseRepository<TDomain, TRaw> {
     await this.model.findByIdAndDelete(id).exec();
   }
 
-  // каждый конкретный репо обязан реализовать эти мапперы
   protected abstract toDomain(doc: TRaw): TDomain;
   protected abstract toPersistence(entity: Partial<TDomain>): Partial<TRaw>;
 }

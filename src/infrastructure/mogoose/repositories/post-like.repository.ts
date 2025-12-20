@@ -46,8 +46,45 @@ export class PostLikeRepository
       .exec();
   }
 
+  async deleteByPost(postId: string): Promise<void> {
+    await this.postLikeModel.deleteMany({ postId: new Types.ObjectId(postId) }).exec();
+  }
+
+  async deleteByUser(userId: string): Promise<void> {
+    await this.postLikeModel.deleteMany({ userId: new Types.ObjectId(userId) }).exec();
+  }
+
   async countByPost(postId: string): Promise<number> {
     return this.postLikeModel.countDocuments({ postId: new Types.ObjectId(postId) }).exec();
+  }
+
+  async countByUser(userId: string): Promise<number> {
+    return this.postLikeModel.countDocuments({ userId: new Types.ObjectId(userId) }).exec();
+  }
+
+  async getTopLikers(limit: number): Promise<{ userId: string; count: number }[]> {
+    const result = await this.postLikeModel.aggregate([
+      { $group: { _id: '$userId', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: limit }
+    ]);
+    return result.map(r => ({ userId: r._id.toString(), count: r.count }));
+  }
+
+  async getTopLikedPosts(limit: number): Promise<{ postId: string; count: number }[]> {
+    const result = await this.postLikeModel.aggregate([
+      { $group: { _id: '$postId', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: limit }
+    ]);
+    return result.map(r => ({ postId: r._id.toString(), count: r.count }));
+  }
+
+  async findByDateRange(start: Date, end: Date): Promise<PostLikeDm[]> {
+    const docs = await this.postLikeModel.find({
+      createdAt: { $gte: start, $lte: end }
+    }).exec();
+    return docs.map((doc) => this.toDomain(doc));
   }
 
   async findPreview(postIds: string[]): Promise<Map<string, string[]>> {
@@ -71,6 +108,13 @@ export class PostLikeRepository
       doc._id.toString(),
       doc.postId.toString(),
       doc.userId.toString(),
+      doc.type,
+      doc.source,
+      doc.weight,
+      doc.metadata,
+      doc.ipAddress,
+      doc.deviceId,
+      doc.sessionId,
       doc.createdAt,
       doc.updatedAt,
     );
@@ -80,6 +124,13 @@ export class PostLikeRepository
     const update: Partial<PostLike> = {};
     if (entity.postId) update.postId = new Types.ObjectId(entity.postId);
     if (entity.userId) update.userId = new Types.ObjectId(entity.userId);
+    if (entity.type !== undefined) update.type = entity.type;
+    if (entity.source !== undefined) update.source = entity.source;
+    if (entity.weight !== undefined) update.weight = entity.weight;
+    if (entity.metadata !== undefined) update.metadata = entity.metadata;
+    if (entity.ipAddress !== undefined) update.ipAddress = entity.ipAddress;
+    if (entity.deviceId !== undefined) update.deviceId = entity.deviceId;
+    if (entity.sessionId !== undefined) update.sessionId = entity.sessionId;
     return update;
   }
 }
