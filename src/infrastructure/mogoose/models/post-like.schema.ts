@@ -3,14 +3,17 @@ import { Document, Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class PostLike extends Document {
-  @Prop({ type: Types.ObjectId, ref: 'post', required: true })
-  postId!: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'post' })
+  postId?: Types.ObjectId; // лайк поста
+
+  @Prop({ type: Types.ObjectId, ref: 'comment' })
+  commentId?: Types.ObjectId; // лайк комментария
 
   @Prop({ type: Types.ObjectId, ref: 'user', required: true })
   userId!: Types.ObjectId;
 
-  @Prop({ type: String, default: 'like' })
-  type!: string; // like | love | haha | angry
+  @Prop({ type: String, enum: ['like', 'love', 'haha', 'angry', 'sad'], default: 'like' })
+  type!: string; // строго типизированные реакции
 
   @Prop({ type: String, default: 'web' })
   source!: string; // web | mobile | api
@@ -30,14 +33,21 @@ export class PostLike extends Document {
   @Prop({ type: String })
   sessionId?: string;
 
+  @Prop({ type: Boolean, default: false })
+  flagged!: boolean;
+
+  @Prop({ type: [String], default: [] })
+  reportReasons!: string[];
+
   createdAt!: Date;
   updatedAt!: Date;
 }
 
 export const PostLikeSchema = SchemaFactory.createForClass(PostLike);
 
-// Индексы для оптимизации
+// Индексы
 PostLikeSchema.index({ postId: 1, userId: 1 }, { unique: true });
+PostLikeSchema.index({ commentId: 1, userId: 1 }, { unique: true });
 PostLikeSchema.index({ userId: 1, createdAt: -1 });
 PostLikeSchema.index({ postId: 1, createdAt: -1 });
 PostLikeSchema.index({ type: 1 });

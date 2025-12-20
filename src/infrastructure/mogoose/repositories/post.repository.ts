@@ -165,28 +165,7 @@ export class PostRepository
   }
 
 protected toDomain(doc: Post): PostDm {
-  return new PostDm(
-    doc._id.toString(),
-    doc.title,
-    doc.content,
-    doc.edited,
-    doc.likeCount,
-    doc.commentCount,
-    doc.poster.toString(),
-    doc.views,
-    doc.tags,
-    doc.isPublished,
-    doc.attachments,
-    doc.status,
-    doc.category,
-    doc.slug,
-    doc.flagged,
-    doc.shareCount,
-    doc.rating,
-    doc.updatedBy,
-    doc.createdAt instanceof Date ? doc.createdAt : undefined,
-    doc.updatedAt instanceof Date ? doc.updatedAt : undefined,
-  );
+  return PostDm.fromDoc(doc);
 }
 
   protected toPersistence(entity: Partial<PostDm>): Partial<Post> {
